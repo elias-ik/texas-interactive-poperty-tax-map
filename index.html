@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texas Counties Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .sign {
+            display: flex;
+            justify-content: center;
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100vw;
+            z-index: 1000;
+        }
+        .sign p {
+            margin: 0;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="sign"><p>County: --- Property Tax: ---</p></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script>
+        // Initialize the map and set its view to Texas
+        const map = L.map('map').setView([31.9686, -99.9018], 6);
+
+        // Set up the OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Load the CSV data for tax information using PapaParse
+        let taxData = {};
+        var min = 100;
+        var max = 0;
+        Papa.parse('tax.csv', {
+            download: true,
+            header: true,
+            complete: function(results) {
+                results.data.forEach(row => {
+                    const taxRateStr = row['Average Effective Property Tax Rate'];
+                    const taxRate = parseFloat(row['Average Effective Property Tax Rate'].replace('%', ''));
+                    taxData[row.County] = {
+                        medianHomeValue: row['Median Home Value'],
+                        medianAnnualTax: row['Median Annual Property Tax Payment'],
+                        averageTaxRate: taxRate
+                    };
+                    if (!isNaN(taxRate) && taxRate > max) {
+                        max = taxRate;
+                    }
+                    if (!isNaN(taxRate) && taxRate < min) {
+                        min = taxRate;
+                    }
+                });
+                console.log('Tax Data Loaded:', taxData);
+                console.log(min, '-', max);
+
+                // Fetch county boundary data from Overpass API after tax data is loaded
+                fetchCountyData();
+            },
+            error: function(error) {
+                console.error('Error loading CSV data:', error);
+            }
+        });
+
+        // Define Overpass API URL and Query for Texas Counties
+        const overpassUrl = 'https://overpass-api.de/api/interpreter';
+        const query = `
+            [out:json];
+            area["ISO3166-2"="US-TX"][admin_level=4];
+            (rel["admin_level"="6"](area););
+            out geom;
+        `;
+
+        // Function to fetch county boundary data from Overpass API
+        function fetchCountyData() {
+            fetch(overpassUrl, {
+                method: 'POST',
+                body: query,
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Convert OSM data to GeoJSON format
+                const geojson = osmtogeojson(data);
+
+                // Filter out any point geometries to avoid extra markers (pins)
+                const filteredGeojson = {
+                    ...geojson,
+                    features: geojson.features.filter(feature => feature.geometry.type !== "Point")
+                };
+
+                // Add GeoJSON layer to the map with hover callback and color coding based on tax rate
+                L.geoJSON(filteredGeojson, {
+                    style: function(feature) {
+                        const countyName = feature.properties.alt_name;
+                        let fillColor = "#ffffff"; // Default color if no tax data is found
+                        if (taxData[countyName]) {
+                            const taxRate = taxData[countyName].averageTaxRate;
+                            // Normalize tax rate for color scaling
+                            const normalizedRate = (taxRate - min) / (max - min);
+                            const red = Math.floor(255 * normalizedRate);
+                            const green = 255 - red;
+                            fillColor = `rgb(${red},${green},0)`;
+                        }
+                        return {
+                            color: "#ff7800",
+                            weight: 1,
+                            fillOpacity: 0.4,
+                            fillColor: fillColor
+                        };
+                    },
+                    onEachFeature: function (feature, layer) {
+                        layer.on('mouseover', function () {
+                            const countyName = feature.properties.alt_name;
+
+                            if (taxData[countyName]) {
+                                document.querySelector('.sign p').textContent = `County: ${countyName}, Property Tax: ${taxData[countyName].averageTaxRate}%`;
+                            } else {
+                                document.querySelector('.sign p').textContent = `County: ${countyName}, Property Tax: ---`;
+                            }
+                        });
+                        layer.on('mouseout', function () {
+                            document.querySelector('.sign p').textContent = 'County: --- Property Tax: ---';
+                        });
+                    }
+                }).addTo(map);
+            })
+            .catch(error => console.error('Error fetching or processing data:', error));
+        }
+    </script>
+</body>
+</html>
