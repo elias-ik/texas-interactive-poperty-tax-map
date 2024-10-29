@@ -4,7 +4,7 @@
 
 An interactive map displaying property tax information for Texas counties. Built with OpenStreetMap, Leaflet.js, and CSV data for visualization. Counties are color-coded by average property tax rates.
 
-[![View the Live Map](button.excalidraw.png)](https://elias-ik.github.io/texas-property-tax-map/)
+[![View the Live Map](button.excalidraw.png)](https://elias-ik.github.io/texas-interactive-poperty-tax-map/)
 
 ## Features
 
