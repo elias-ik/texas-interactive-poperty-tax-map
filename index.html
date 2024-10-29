@@ -34,7 +34,7 @@
 </head>
 <body>
     <div id="map"></div>
-    <div class="sign"><p>County: --- Property Tax: ---</p></div>
+    <div class="sign"><p>County: --- Average Property Tax: ---</p></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/osmtogeojson@3.0.0-beta.5/osmtogeojson.js"></script>
     <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
@@ -134,13 +134,13 @@
                             const countyName = feature.properties.alt_name;
 
                             if (taxData[countyName]) {
-                                document.querySelector('.sign p').textContent = `County: ${countyName}, Property Tax: ${taxData[countyName].averageTaxRate}%`;
+                                document.querySelector('.sign p').textContent = `County: ${countyName}, Average Property Tax: ${taxData[countyName].averageTaxRate}%`;
                             } else {
-                                document.querySelector('.sign p').textContent = `County: ${countyName}, Property Tax: ---`;
+                                document.querySelector('.sign p').textContent = `County: ${countyName}, Average Property Tax: ---`;
                             }
                         });
                         layer.on('mouseout', function () {
-                            document.querySelector('.sign p').textContent = 'County: --- Property Tax: ---';
+                            document.querySelector('.sign p').textContent = 'County: --- Average Property Tax: ---';
                         });
                     }
                 }).addTo(map);
